@@ -48,11 +48,11 @@ docker pull "${DOCKER_USERNAME}/rightsteps-backend:${SHA_TAG}"
 # Check if deployment already exists
 if docker ps -a --format '{{.Names}}' | grep -q "^backend-${SHA}$"; then
     echo -e "${YELLOW}Deployment backend-${SHA} already exists. Removing...${NC}"
-    docker-compose -f "docker-compose.sha-${SHA}.yml" down -v 2>/dev/null || true
+    docker compose -p "rightsteps-sha-${SHA}" -f "docker-compose.sha-${SHA}.yml" down -v 2>/dev/null || true
     rm -f "docker-compose.sha-${SHA}.yml"
 fi
 
-# Generate docker-compose file from template
+# Generate docker compose file from template
 echo -e "${YELLOW}Generating docker-compose.sha-${SHA}.yml...${NC}"
 export SHA="${SHA}"
 export SHA_TAG="${SHA_TAG}"
@@ -68,12 +68,12 @@ else
     exit 1
 fi
 
-# Create docker-compose file
+# Create docker compose file
 envsubst < docker-compose.sha-template.yml > "docker-compose.sha-${SHA}.yml"
 
-# Deploy
+# Deploy with unique project name for this SHA
 echo -e "${YELLOW}Starting deployment...${NC}"
-docker-compose -f "docker-compose.sha-${SHA}.yml" up -d
+docker compose -p "rightsteps-sha-${SHA}" -f "docker-compose.sha-${SHA}.yml" up -d
 
 # Wait for health check
 echo -e "${YELLOW}Waiting for deployment to be healthy...${NC}"
@@ -111,4 +111,4 @@ echo -e "URL: https://${SHA}.rightsteps.app"
 echo -e "Container: backend-${SHA}"
 echo -e ""
 echo -e "View logs: docker logs -f backend-${SHA}"
-echo -e "Stop: docker-compose -f docker-compose.sha-${SHA}.yml down"
+echo -e "Stop: docker compose -p rightsteps-sha-${SHA} -f docker-compose.sha-${SHA}.yml down"

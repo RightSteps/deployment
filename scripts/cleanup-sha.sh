@@ -50,7 +50,7 @@ for CONTAINER in $TO_REMOVE; do
 
     # Stop and remove containers
     if [ -f "docker-compose.sha-${SHA}.yml" ]; then
-        docker-compose -f "docker-compose.sha-${SHA}.yml" down -v 2>/dev/null || true
+        docker compose -p "rightsteps-sha-${SHA}" -f "docker-compose.sha-${SHA}.yml" down -v 2>/dev/null || true
         rm -f "docker-compose.sha-${SHA}.yml"
     else
         # Fallback: remove containers directly

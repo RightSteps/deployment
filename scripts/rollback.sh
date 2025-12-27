@@ -22,16 +22,19 @@ echo -e "${RED}========================================${NC}"
 echo -e "${RED}ROLLBACK - ${ENVIRONMENT}${NC}"
 echo -e "${RED}========================================${NC}"
 
-# Determine compose file
+# Determine compose file and project name
 case $ENVIRONMENT in
   production|prod)
     COMPOSE_FILE="docker-compose.prod.yml"
+    PROJECT_NAME="rightsteps-production"
     ;;
   staging)
     COMPOSE_FILE="docker-compose.staging.yml"
+    PROJECT_NAME="rightsteps-staging"
     ;;
   dev|development)
     COMPOSE_FILE="docker-compose.dev.yml"
+    PROJECT_NAME="rightsteps-dev"
     ;;
   *)
     echo -e "${RED}Error: Unknown environment '${ENVIRONMENT}'${NC}"
@@ -56,8 +59,8 @@ fi
 
 # Step 2: Stop current container
 echo -e "${YELLOW}[1/4] Stopping current container...${NC}"
-docker compose -f $COMPOSE_FILE stop app
-docker compose -f $COMPOSE_FILE rm -f app
+docker compose -p $PROJECT_NAME -f $COMPOSE_FILE stop app
+docker compose -p $PROJECT_NAME -f $COMPOSE_FILE rm -f app
 
 # Step 3: Restore database
 echo -e "${YELLOW}[2/4] Restoring database from backup...${NC}"
@@ -106,7 +109,7 @@ if [ -z "$PREVIOUS_TAG" ]; then
 fi
 
 export IMAGE_TAG=$PREVIOUS_TAG
-docker compose -f $COMPOSE_FILE up -d app
+docker compose -p $PROJECT_NAME -f $COMPOSE_FILE up -d app
 
 # Step 5: Verify rollback
 echo -e "${YELLOW}[4/4] Verifying rollback...${NC}"
