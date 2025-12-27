@@ -1,0 +1,103 @@
+# SHA-Based Preview Deployment Template
+# This template is used to deploy PR preview environments
+# Usage: Generated automatically by deploy-sha.sh script
+
+version: '3.8'
+
+services:
+  app:
+    image: ${DOCKER_USERNAME}/rightsteps-backend:${SHA_TAG}
+    container_name: backend-${SHA}
+    restart: unless-stopped
+    env_file:
+      - .env.sha
+    environment:
+      - NODE_ENV=preview
+      - SHA=${SHA}
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/v1/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "2"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres-${SHA}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}_${SHA}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_sha_${SHA}_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-${SHA}
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_sha_${SHA}_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+
+volumes:
+  postgres_sha_${SHA}_data:
+    driver: local
+  redis_sha_${SHA}_data:
+    driver: local
+
+networks:
+  app-network:
+    external: true
