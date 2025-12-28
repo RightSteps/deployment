@@ -9,6 +9,8 @@ services:
     image: ${DOCKER_USERNAME}/rightsteps-backend:${SHA_TAG}
     container_name: backend-${SHA}
     restart: unless-stopped
+    ports:
+      - "${SHA_PORT}:5000"
     env_file:
       - .env.sha
     environment:

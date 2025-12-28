@@ -27,8 +27,14 @@ SHA=$1
 DOCKER_USERNAME=$2
 SHA_TAG="sha-${SHA}"
 
+# Calculate unique port for this SHA (50000-59999 range)
+# Use SHA hash to generate deterministic port number
+SHA_HASH=$(echo -n "${SHA}" | md5sum | cut -c1-8)
+SHA_PORT=$((50000 + 0x${SHA_HASH:0:4} % 10000))
+
 echo -e "${GREEN}======================================${NC}"
 echo -e "${GREEN}Deploying SHA: ${SHA}${NC}"
+echo -e "${GREEN}Port: ${SHA_PORT}${NC}"
 echo -e "${GREEN}======================================${NC}"
 
 # Set deployment directory
@@ -56,6 +62,7 @@ fi
 echo -e "${YELLOW}Generating docker-compose.sha-${SHA}.yml...${NC}"
 export SHA="${SHA}"
 export SHA_TAG="${SHA_TAG}"
+export SHA_PORT="${SHA_PORT}"
 export DOCKER_USERNAME="${DOCKER_USERNAME}"
 
 # Source environment variables
@@ -122,6 +129,34 @@ if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
     echo -e "${YELLOW}Check logs: docker logs backend-${SHA}${NC}"
     exit 1
 fi
+
+# Update nginx configuration for SHA routing
+echo -e "${YELLOW}Updating nginx configuration...${NC}"
+NGINX_MAP_FILE="/etc/nginx/conf.d/sha-routing-map.conf"
+
+# Create/update the map file with SHA → Port mapping
+sudo bash -c "cat > ${NGINX_MAP_FILE}" <<EOF
+# Auto-generated SHA preview routing map
+# This file maps SHA subdomains to their respective backend ports
+map \$http_host \$sha_backend_port {
+    default 3000;  # Fallback to production
+EOF
+
+# Add all existing SHA deployments to the map
+for container in $(docker ps --format '{{.Names}}' | grep '^backend-[a-f0-9]\{7\}$'); do
+    CONTAINER_SHA=$(echo ${container} | sed 's/backend-//')
+    CONTAINER_PORT=$(docker port ${container} 5000 | cut -d':' -f2)
+    sudo bash -c "echo '    ${CONTAINER_SHA}.rightsteps.app ${CONTAINER_PORT};' >> ${NGINX_MAP_FILE}"
+done
+
+sudo bash -c "echo '}' >> ${NGINX_MAP_FILE}"
+
+# Update the SHA deployments nginx config to use the map
+sudo sed -i 's|proxy_pass http://localhost:3000;|proxy_pass http://localhost:$sha_backend_port;|' /etc/nginx/sites-available/sha-deployments.rightsteps.app
+
+# Reload nginx
+sudo nginx -s reload
+echo -e "${GREEN}✓ Nginx configuration updated and reloaded${NC}"
 
 # Cleanup old deployments (keep last 3)
 echo -e "${YELLOW}Checking for old deployments...${NC}"
