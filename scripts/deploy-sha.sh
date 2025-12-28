@@ -75,6 +75,23 @@ envsubst < docker-compose.sha-template.yml > "docker-compose.sha-${SHA}.yml"
 echo -e "${YELLOW}Starting deployment...${NC}"
 docker compose -p "rightsteps-sha-${SHA}" -f "docker-compose.sha-${SHA}.yml" up -d
 
+# Wait for containers to be ready
+echo -e "${YELLOW}Waiting for containers to start...${NC}"
+sleep 10
+
+# Run database migrations
+echo -e "${YELLOW}Running database migrations...${NC}"
+docker exec "backend-${SHA}" npx prisma migrate deploy || {
+    echo -e "${YELLOW}First migration attempt failed, retrying after waiting...${NC}"
+    sleep 5
+    docker exec "backend-${SHA}" npx prisma migrate deploy || {
+        echo -e "${RED}✗ Migration failed${NC}"
+        echo -e "${YELLOW}Check logs: docker logs backend-${SHA}${NC}"
+        exit 1
+    }
+}
+echo -e "${GREEN}✓ Migrations completed successfully${NC}"
+
 # Wait for health check
 echo -e "${YELLOW}Waiting for deployment to be healthy...${NC}"
 sleep 5
