@@ -71,26 +71,26 @@ fi
 # Create docker compose file
 envsubst < docker-compose.sha-template.yml > "docker-compose.sha-${SHA}.yml"
 
-# Deploy with unique project name for this SHA
-echo -e "${YELLOW}Starting deployment...${NC}"
-docker compose -p "rightsteps-sha-${SHA}" -f "docker-compose.sha-${SHA}.yml" up -d
+# Deploy database and redis first (without app)
+echo -e "${YELLOW}Starting database and redis...${NC}"
+docker compose -p "rightsteps-sha-${SHA}" -f "docker-compose.sha-${SHA}.yml" up -d postgres redis
 
-# Wait for containers to be ready
-echo -e "${YELLOW}Waiting for containers to start...${NC}"
+# Wait for database to be ready
+echo -e "${YELLOW}Waiting for database to be ready...${NC}"
 sleep 10
 
-# Run database migrations
+# Run database migrations using one-off container
 echo -e "${YELLOW}Running database migrations...${NC}"
-docker exec "backend-${SHA}" npx prisma migrate deploy || {
-    echo -e "${YELLOW}First migration attempt failed, retrying after waiting...${NC}"
-    sleep 5
-    docker exec "backend-${SHA}" npx prisma migrate deploy || {
-        echo -e "${RED}✗ Migration failed${NC}"
-        echo -e "${YELLOW}Check logs: docker logs backend-${SHA}${NC}"
-        exit 1
-    }
+docker compose -p "rightsteps-sha-${SHA}" -f "docker-compose.sha-${SHA}.yml" run --rm --no-deps app npx prisma migrate deploy || {
+    echo -e "${RED}✗ Migration failed${NC}"
+    docker compose -p "rightsteps-sha-${SHA}" -f "docker-compose.sha-${SHA}.yml" down
+    exit 1
 }
 echo -e "${GREEN}✓ Migrations completed successfully${NC}"
+
+# Now start the app container
+echo -e "${YELLOW}Starting application...${NC}"
+docker compose -p "rightsteps-sha-${SHA}" -f "docker-compose.sha-${SHA}.yml" up -d app
 
 # Wait for health check
 echo -e "${YELLOW}Waiting for deployment to be healthy...${NC}"
