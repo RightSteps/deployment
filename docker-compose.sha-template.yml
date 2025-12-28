@@ -14,6 +14,7 @@ services:
     environment:
       - NODE_ENV=preview
       - SHA=${SHA}
+      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/rightsteps_preview_${SHA}
     networks:
       - app-network
     healthcheck:
