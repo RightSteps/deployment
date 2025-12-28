@@ -97,10 +97,15 @@ echo -e "${GREEN}✓ Migrations completed successfully${NC}"
 
 # Run database seed
 echo -e "${YELLOW}Seeding database...${NC}"
-docker compose -p "rightsteps-sha-${SHA}" -f "docker-compose.sha-${SHA}.yml" run --rm --no-deps app npm run db:seed || {
-    echo -e "${YELLOW}⚠ Seed failed (may already be seeded)${NC}"
-}
-echo -e "${GREEN}✓ Database seed completed${NC}"
+if docker compose -p "rightsteps-sha-${SHA}" -f "docker-compose.sha-${SHA}.yml" run --rm --no-deps app npm run db:seed; then
+    echo -e "${GREEN}✓ Database seed completed successfully${NC}"
+else
+    echo -e "${RED}✗ Seed failed${NC}"
+    echo -e "${YELLOW}Showing seed logs:${NC}"
+    docker compose -p "rightsteps-sha-${SHA}" -f "docker-compose.sha-${SHA}.yml" logs app
+    docker compose -p "rightsteps-sha-${SHA}" -f "docker-compose.sha-${SHA}.yml" down
+    exit 1
+fi
 
 # Now start the app container
 echo -e "${YELLOW}Starting application...${NC}"
