@@ -47,6 +47,11 @@ if ! docker network ls | grep -q app-network; then
     docker network create app-network
 fi
 
+# Cleanup old deployments BEFORE starting new one (keep last 3)
+# This prevents any conflict with the new deployment's Nginx entry
+echo -e "${YELLOW}Checking for old deployments...${NC}"
+./scripts/cleanup-sha.sh 3
+
 # Pull latest image
 echo -e "${YELLOW}Pulling image: ${DOCKER_USERNAME}/rightsteps-backend:${SHA_TAG}${NC}"
 docker pull "${DOCKER_USERNAME}/rightsteps-backend:${SHA_TAG}"
@@ -147,8 +152,14 @@ if [ -f "$NGINX_MAP_FILE" ]; then
         # Backup
         sudo cp "$NGINX_MAP_FILE" "${NGINX_MAP_FILE}.backup-$(date +%s)" 2>/dev/null || true
 
-        # Add entry before closing brace
-        sudo sed -i "/^}/i \\      ${SHA}.rightsteps.app ${SHA_PORT};" "$NGINX_MAP_FILE"
+        # Add entry before closing brace (match brace with optional leading whitespace)
+        sudo sed -i "/^[[:space:]]*}/i \\      ${SHA}.rightsteps.app ${SHA_PORT};" "$NGINX_MAP_FILE"
+
+        # Verify entry was added
+        if ! grep -q "${SHA}.rightsteps.app ${SHA_PORT}" "$NGINX_MAP_FILE"; then
+            echo -e "${RED}✗ Failed to add Nginx entry${NC}"
+            exit 1
+        fi
 
         # Test nginx config
         if sudo nginx -t 2>&1 | grep -q "successful"; then
@@ -157,8 +168,11 @@ if [ -f "$NGINX_MAP_FILE" ]; then
             echo -e "${GREEN}✓ Nginx routing configured and reloaded${NC}"
         else
             echo -e "${RED}✗ Nginx config test failed${NC}"
-            # Restore backup
-            sudo cp "${NGINX_MAP_FILE}.backup-$(date +%s)" "$NGINX_MAP_FILE" 2>/dev/null || true
+            # Restore from the backup we created (not a new timestamp!)
+            BACKUP_FILE=$(ls -t "${NGINX_MAP_FILE}.backup-"* 2>/dev/null | head -1)
+            if [ -n "$BACKUP_FILE" ]; then
+                sudo cp "$BACKUP_FILE" "$NGINX_MAP_FILE" 2>/dev/null || true
+            fi
             exit 1
         fi
     fi
@@ -172,9 +186,7 @@ echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━�
 echo -e "${GREEN}✓ Deployment successful!${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-# Cleanup old deployments (keep last 3)
-echo -e "${YELLOW}Checking for old deployments...${NC}"
-./scripts/cleanup-sha.sh 3
+# Note: Cleanup already ran at the beginning of this script
 
 echo -e "${GREEN}======================================${NC}"
 echo -e "${GREEN}Deployment Complete!${NC}"

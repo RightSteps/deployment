@@ -24,8 +24,9 @@ echo -e "${YELLOW}Cleaning up SHA deployments (keeping last ${KEEP_COUNT})...${N
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$DEPLOY_DIR"
 
-# Get all SHA deployments sorted by creation time (oldest first)
-SHA_CONTAINERS=$(docker ps -a --filter "name=^backend-[a-f0-9]{7}$" --format "{{.CreatedAt}}\t{{.Names}}" | sort | awk '{print $NF}')
+# Get all RUNNING SHA deployments sorted by creation time (oldest first)
+# Using 'docker ps' (not 'docker ps -a') to only consider running containers
+SHA_CONTAINERS=$(docker ps --filter "name=^backend-[a-f0-9]{7}$" --format "{{.CreatedAt}}\t{{.Names}}" | sort | awk '{print $NF}')
 
 # Count total deployments
 TOTAL=$(echo "$SHA_CONTAINERS" | grep -c "backend-" || true)
