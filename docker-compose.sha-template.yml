@@ -16,7 +16,7 @@ services:
     environment:
       - NODE_ENV=preview
       - SHA=${SHA}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}_${SHA}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-${SHA}:5432/${POSTGRES_DB}_${SHA}
     networks:
       - app-network
     healthcheck:
