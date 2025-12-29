@@ -135,16 +135,41 @@ if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
     exit 1
 fi
 
-# Nginx routing info
+# Auto-configure Nginx routing
+echo -e "${YELLOW}Configuring Nginx routing...${NC}"
+NGINX_MAP_FILE="/etc/nginx/conf.d/sha-routing-map.conf"
+
+if [ -f "$NGINX_MAP_FILE" ]; then
+    # Check if entry already exists
+    if grep -q "${SHA}.rightsteps.app" "$NGINX_MAP_FILE" 2>/dev/null; then
+        echo -e "${GREEN}✓ Nginx routing already exists${NC}"
+    else
+        # Backup
+        sudo cp "$NGINX_MAP_FILE" "${NGINX_MAP_FILE}.backup-$(date +%s)" 2>/dev/null || true
+
+        # Add entry before closing brace
+        sudo sed -i "/^}/i \\      ${SHA}.rightsteps.app ${SHA_PORT};" "$NGINX_MAP_FILE"
+
+        # Test nginx config
+        if sudo nginx -t 2>&1 | grep -q "successful"; then
+            # Reload nginx
+            sudo nginx -s reload
+            echo -e "${GREEN}✓ Nginx routing configured and reloaded${NC}"
+        else
+            echo -e "${RED}✗ Nginx config test failed${NC}"
+            # Restore backup
+            sudo cp "${NGINX_MAP_FILE}.backup-$(date +%s)" "$NGINX_MAP_FILE" 2>/dev/null || true
+            exit 1
+        fi
+    fi
+else
+    echo -e "${YELLOW}⚠ Nginx map file not found. Manual configuration required:${NC}"
+    echo -e "Add this entry to ${GREEN}/etc/nginx/conf.d/sha-routing-map.conf${NC}:"
+    echo -e "    ${GREEN}${SHA}.rightsteps.app ${SHA_PORT};${NC}"
+fi
+
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}✓ Deployment successful!${NC}"
-echo -e ""
-echo -e "${YELLOW}Nginx Configuration (if not auto-configured):${NC}"
-echo -e "Add this entry to ${GREEN}/etc/nginx/conf.d/sha-routing-map.conf${NC}:"
-echo -e "    ${GREEN}${SHA}.rightsteps.app ${SHA_PORT};${NC}"
-echo -e ""
-echo -e "Then reload nginx:"
-echo -e "    ${GREEN}sudo nginx -s reload${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 # Cleanup old deployments (keep last 3)

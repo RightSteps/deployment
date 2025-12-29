@@ -59,6 +59,16 @@ for CONTAINER in $TO_REMOVE; do
         docker volume rm "deployment_postgres_sha_${SHA}_data" "deployment_redis_sha_${SHA}_data" 2>/dev/null || true
     fi
 
+    # Remove Nginx routing entry
+    NGINX_MAP_FILE="/etc/nginx/conf.d/sha-routing-map.conf"
+    if [ -f "$NGINX_MAP_FILE" ]; then
+        if grep -q "${SHA}.rightsteps.app" "$NGINX_MAP_FILE" 2>/dev/null; then
+            echo -e "${YELLOW}Removing Nginx routing for ${SHA}...${NC}"
+            sudo sed -i "/${SHA}.rightsteps.app/d" "$NGINX_MAP_FILE"
+            sudo nginx -s reload 2>/dev/null || echo -e "${YELLOW}⚠ Could not reload Nginx${NC}"
+        fi
+    fi
+
     echo -e "${GREEN}✓ Removed deployment: ${SHA}${NC}"
 done
 
