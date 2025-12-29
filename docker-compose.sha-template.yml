@@ -17,6 +17,7 @@ services:
       - NODE_ENV=preview
       - SHA=${SHA}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-${SHA}:5432/${POSTGRES_DB}_${SHA}
+      - REDIS_CLUSTER_URLS=redis://:${REDIS_PASSWORD}@redis-${SHA}:6379
     networks:
       - app-network
     healthcheck:
