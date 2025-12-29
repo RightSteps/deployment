@@ -18,7 +18,11 @@ NC='\033[0m'
 
 KEEP_COUNT=${1:-3}
 
-echo -e "${YELLOW}Cleaning up SHA deployments (keeping last ${KEEP_COUNT})...${NC}"
+# When cleanup runs BEFORE deployment (as called from deploy-sha.sh),
+# we need to keep (KEEP_COUNT - 1) so after new deployment total = KEEP_COUNT
+ACTUAL_KEEP=$((KEEP_COUNT - 1))
+
+echo -e "${YELLOW}Cleaning up SHA deployments (target: ${KEEP_COUNT} total after new deployment)...${NC}"
 
 # Set deployment directory
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -31,13 +35,13 @@ SHA_CONTAINERS=$(docker ps --filter "name=^backend-[a-f0-9]{7}$" --format "{{.Cr
 # Count total deployments
 TOTAL=$(echo "$SHA_CONTAINERS" | grep -c "backend-" || true)
 
-if [ "$TOTAL" -le "$KEEP_COUNT" ]; then
+if [ "$TOTAL" -le "$ACTUAL_KEEP" ]; then
     echo -e "${GREEN}✓ Only ${TOTAL} SHA deployment(s) found. No cleanup needed.${NC}"
     exit 0
 fi
 
 # Calculate how many to remove
-REMOVE_COUNT=$((TOTAL - KEEP_COUNT))
+REMOVE_COUNT=$((TOTAL - ACTUAL_KEEP))
 
 echo -e "${YELLOW}Found ${TOTAL} SHA deployment(s), removing oldest ${REMOVE_COUNT}...${NC}"
 
@@ -77,7 +81,7 @@ echo -e "${GREEN}======================================${NC}"
 echo -e "${GREEN}Cleanup Complete!${NC}"
 echo -e "${GREEN}======================================${NC}"
 echo -e "Removed: ${REMOVE_COUNT} deployment(s)"
-echo -e "Keeping: ${KEEP_COUNT} deployment(s)"
+echo -e "Keeping: ${ACTUAL_KEEP} deployment(s) (will be ${KEEP_COUNT} after new deployment)"
 
 # Show remaining deployments
 echo -e ""
